@@ -103,6 +103,8 @@ namespace cv{
     void extractCN(Mat patch_data, Mat & cnFeatures) const;
     void denseGaussKernel(const float sigma, const Mat , const Mat y_data, Mat & k_data,
                           std::vector<Mat> & layers_data,std::vector<Mat> & xf_data,std::vector<Mat> & yf_data, std::vector<Mat> xyf_v, Mat xy, Mat xyf ) const;
+   void denseLinearKernel(const Mat &x_data, const Mat &y_data, Mat &kf_data, std::vector<Mat> & layers_data,
+    		                    std::vector<Mat> & xf_data,std::vector<Mat> & yf_data, std::vector<Mat> xyf_v) const;
     void calcResponse(const Mat alphaf_data, const Mat kf_data, Mat & response_data, Mat & spec_data) const;
     void calcResponse(const Mat alphaf_data, const Mat alphaf_den_data, const Mat kf_data, Mat & response_data, Mat & spec_data, Mat & spec2_data) const;
 
@@ -353,11 +355,18 @@ namespace cv{
         merge(Zc,2,z);
       }
 
-      //compute the gaussian kernel
-      denseGaussKernel(params.sigma,x,z,k,layers,vxf,vyf,vxyf,xy_data,xyf_data);
+      if (params.correlation_method == 0)
+      {
+        //compute the gaussian kernel
+        denseGaussKernel(params.sigma,x,z,k,layers,vxf,vyf,vxyf,xy_data,xyf_data);
 
-      // compute the fourier transform of the kernel
-      fft2(k,kf);
+        // compute the fourier transform of the kernel
+        fft2(k,kf);
+      }
+      else
+      {
+        denseLinearKernel(x,z,kf,layers,vxf,vyf,vxyf);
+      }
       if(frame==1)spec2=Mat_<Vec2f >(kf.rows, kf.cols);
 
       // calculate filter response
@@ -441,8 +450,15 @@ namespace cv{
       new_alphaf=Mat_<Vec2f >(yf.rows, yf.cols);
     }
 
-    // Kernel Regularized Least-Squares, calculate alphas
-    denseGaussKernel(params.sigma,x,x,k,layers,vxf,vyf,vxyf,xy_data,xyf_data);
+    if (params.correlation_method == 0)
+    {
+      // Kernel Regularized Least-Squares, calculate alphas
+      denseGaussKernel(params.sigma,x,x,k,layers,vxf,vyf,vxyf,xy_data,xyf_data);
+    }
+    else
+    {
+      denseLinearKernel(x,x,kf,layers,vxf,vyf,vxyf);
+    }
 
     // compute the fourier transform of the kernel and add a small value
     fft2(k,kf);
@@ -805,6 +821,18 @@ namespace cv{
     exp(xy,k_data);
 
   }
+   
+  void TrackerKCFImpl::denseLinearKernel(const Mat &x_data, const Mat &y_data, Mat &kf_data,
+		                                       std::vector<Mat> & layers_data,std::vector<Mat> & xf_data,std::vector<Mat> & yf_data, std::vector<Mat> xyf_v) const
+  {
+	  Mat xyf;
+
+	  fft2(x_data,xf_data,layers_data);
+	  fft2(y_data,yf_data,layers_data);
+	  pixelWiseMult(xf_data,yf_data,xyf_v,0,true);
+	  sumChannels(xyf_v,xyf);
+	  kf_data = xyf/(x_data.rows*x_data.cols*x_data.channels());
+  }
 
   /* CIRCULAR SHIFT Function
    * http://stackoverflow.com/questions/10420454/shift-like-matlab-function-rows-or-columns-of-a-matrix-in-opencv
@@ -919,6 +947,8 @@ namespace cv{
       compress_feature=true;
       compressed_size=2;
       pca_learning_rate=0.15f;
+   
+      correlation_method = 0;
   }
 
   void TrackerKCF::Params::read( const cv::FileNode& fn ){
@@ -966,6 +996,9 @@ namespace cv{
 
       if (!fn["pca_learning_rate"].empty())
           fn["pca_learning_rate"] >> pca_learning_rate;
+   
+      if (!fn["correlation_method"].empty())
+          fn["correlation_method"] >> correlation_method;
   }
 
   void TrackerKCF::Params::write( cv::FileStorage& fs ) const{
@@ -983,5 +1016,6 @@ namespace cv{
     fs << "compress_feature" << compress_feature;
     fs << "compressed_size" << compressed_size;
     fs << "pca_learning_rate" << pca_learning_rate;
+    fs << "correlation_method" << correlation_method;
   }
 } /* namespace cv */
