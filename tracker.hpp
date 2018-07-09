@@ -1190,6 +1190,7 @@ public:
     int compressed_size;          //!<  feature size after compression
     int desc_pca;        //!<  compressed descriptors of TrackerKCF::MODE
     int desc_npca;       //!<  non-compressed descriptors of TrackerKCF::MODE
+    int correlation_method;		//!<  correlation method 0:	gaussian 1:linear
   };
 
   virtual void setFeatureExtractor(void(*)(const Mat, const Rect, Mat&), bool pca_func = false) = 0;
