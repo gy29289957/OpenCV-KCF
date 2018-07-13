@@ -454,14 +454,15 @@ namespace cv{
     {
       // Kernel Regularized Least-Squares, calculate alphas
       denseGaussKernel(params.sigma,x,x,k,layers,vxf,vyf,vxyf,xy_data,xyf_data);
+	
+      // compute the fourier transform of the kernel and add a small value
+      fft2(k,kf);
     }
     else
     {
       denseLinearKernel(x,x,kf,layers,vxf,vyf,vxyf);
     }
 
-    // compute the fourier transform of the kernel and add a small value
-    fft2(k,kf);
     kf_lambda=kf+params.lambda;
 
     float den;
